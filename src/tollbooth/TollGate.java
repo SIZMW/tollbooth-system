@@ -78,57 +78,6 @@ public class TollGate {
     }
 
     /**
-     * Closes the gate. See {@link TollGate#close()}
-     *
-     * @param remainingRetryCount
-     *            The number of tries to retry the open action.
-     * @param logName
-     *            The name to output in all the log messages as the caller
-     *            function.
-     * @param isRetry
-     *            The state of this function call for whether it is a retry call
-     *            or not.
-     * @throws TollboothException
-     *             If it is in the "will not respond" state and the close
-     *             request is made, or it goes into the "will not respond"
-     *             state.
-     */
-    private void close(int remainingRetryCount, String logName, boolean isRetry)
-            throws TollboothException {
-        // Gate is not responding
-        if (willNotRespond) {
-            logMessage(logName + ": will not respond", null);
-            throw new TollboothException(logName + ": will not respond", null);
-        }
-
-        // All other cases
-        try {
-            boolean wasOpen = isOpen();
-            controller.close();
-
-            // Increase the number of closes and log it
-            if (wasOpen) {
-                numberOfCloses++;
-
-                // Log success only if it is retrying
-                if (isRetry) {
-                    logMessage(logName + ": successful", null);
-                }
-            }
-        } catch (TollboothException e) {
-            // Determine whether to retry or set not responsive state
-            if (remainingRetryCount <= 0) {
-                willNotRespond = true;
-                logMessage(logName + ": unrecoverable malfunction", e);
-                throw new TollboothException(e.getMessage(), e);
-            } else {
-                logMessage(logName + ": malfunction", e);
-                close(remainingRetryCount - 1, logName, true);
-            }
-        }
-    }
-
-    /**
      * Returns the number of times the gate was closed.
      *
      * @return The number of times that the gate has been closed (that is, the
@@ -157,16 +106,90 @@ public class TollGate {
      *
      * @return true if the gate is open, false otherwise
      * @throws TollboothException
-     *             If it is in the "will not respond" state and the isOpen
-     *             request is made.
+     *             If isOpen() on the controller throws an exception.
      */
     public boolean isOpen() throws TollboothException {
-        if (willNotRespond) {
-            throw new TollboothException("isOpen: will not respond");
-        }
-
         boolean state = controller.isOpen();
         return state;
+    }
+
+    /**
+     * Opens the gate. If the gate fails to open, it will retry as many times as
+     * specified when this object was built, or 5 as a default if no retry count
+     * was given. If the gate is not responsive, the log will be updated and
+     * nothing will occur. This function will recursively retry opening the
+     * gate.
+     *
+     * @throws TollboothException
+     *             If it is in the "will not respond" state and the open request
+     *             is made, or it goes into the "will not respond" state.
+     */
+    public void open() throws TollboothException {
+        open(retryCount + 1, "open", false);
+    }
+
+    /**
+     * Reset the gate to the state it was in when created with the exception of
+     * the statistics.
+     *
+     * @throws TollboothException
+     *             If it goes into the "will not respond" state.
+     */
+    public void reset() throws TollboothException {
+        reset(retryCount + 1, "reset", false);
+    }
+
+    /**
+     * Closes the gate. See {@link TollGate#close()}
+     *
+     * @param remainingRetryCount
+     *            The number of tries to retry the open action.
+     * @param logName
+     *            The name to output in all the log messages as the caller
+     *            function.
+     * @param isRetry
+     *            The state of this function call for whether it is a retry call
+     *            or not.
+     * @throws TollboothException
+     *             If it is in the "will not respond" state and the close
+     *             request is made, or it goes into the "will not respond"
+     *             state.
+     */
+    private void close(int remainingRetryCount, String logName, boolean isRetry)
+            throws TollboothException {
+        // Gate is not responding
+        if (willNotRespond) {
+            logMessage(logName + ": will not respond", null);
+            return;
+        }
+
+        // All other cases
+        try {
+            boolean wasOpen = isOpen();
+            controller.close();
+
+            // Increase the number of closes and log it
+            if (wasOpen) {
+                numberOfCloses++;
+
+                // Log success only if it is retrying
+                if (isRetry) {
+                    logMessage(logName + ": successful", null);
+                }
+            }
+        } catch (TollboothException e) {
+            logMessage(logName + ": malfunction", e);
+            remainingRetryCount--;
+
+            // Determine whether to retry or set not responsive state
+            if (remainingRetryCount <= 0) {
+                willNotRespond = true;
+                logMessage(logName + ": unrecoverable malfunction", e);
+                throw new TollboothException(e.getMessage(), e);
+            }
+
+            close(remainingRetryCount, logName, true);
+        }
     }
 
     /**
@@ -189,21 +212,6 @@ public class TollGate {
     }
 
     /**
-     * Opens the gate. If the gate fails to open, it will retry as many times as
-     * specified when this object was built, or 5 as a default if no retry count
-     * was given. If the gate is not responsive, the log will be updated and
-     * nothing will occur. This function will recursively retry opening the
-     * gate.
-     *
-     * @throws TollboothException
-     *             If it is in the "will not respond" state and the open request
-     *             is made, or it goes into the "will not respond" state.
-     */
-    public void open() throws TollboothException {
-        open(retryCount + 1, "open", false);
-    }
-
-    /**
      * Opens the gate. See {@link TollGate#open()}
      *
      * @param remainingRetryCount
@@ -223,7 +231,7 @@ public class TollGate {
         // Gate is not responding
         if (willNotRespond) {
             logMessage(logName + ": will not respond", null);
-            throw new TollboothException(logName + ": will not respond", null);
+            return;
         }
 
         // All other cases
@@ -239,27 +247,18 @@ public class TollGate {
                 }
             }
         } catch (TollboothException e) {
+            logMessage(logName + ": malfunction", e);
+            remainingRetryCount--;
+
             // Determine whether to retry or set not responsive state
             if (remainingRetryCount <= 0) {
                 willNotRespond = true;
                 logMessage(logName + ": unrecoverable malfunction", e);
                 throw new TollboothException(e.getMessage(), e);
-            } else {
-                logMessage(logName + ": malfunction", e);
-                open(remainingRetryCount - 1, logName, true);
             }
-        }
-    }
 
-    /**
-     * Reset the gate to the state it was in when created with the exception of
-     * the statistics.
-     *
-     * @throws TollboothException
-     *             If it goes into the "will not respond" state.
-     */
-    public void reset() throws TollboothException {
-        reset(retryCount + 1, "reset", false);
+            open(remainingRetryCount, logName, true);
+        }
     }
 
     /**
@@ -278,17 +277,6 @@ public class TollGate {
      */
     private void reset(int remainingRetryCount, String logName, boolean isRetry)
             throws TollboothException {
-        // If gate is closed, we are done
-        try {
-            if (!isOpen()) {
-                logMessage(logName + ": successful", null);
-                return;
-            }
-        } catch (TollboothException e) {
-            e.toString();
-            // Do nothing since we could not check the state, continue on
-        }
-
         // All other cases
         try {
             // The understanding is that reset() will take care of setting the
@@ -297,15 +285,17 @@ public class TollGate {
             controller.reset();
             logMessage(logName + ": successful", null);
         } catch (TollboothException e) {
+            logMessage(logName + ": malfunction", e);
+            remainingRetryCount--;
+
             // Determine whether to retry or set not responsive state
             if (remainingRetryCount <= 0) {
                 willNotRespond = true;
                 logMessage(logName + ": unrecoverable malfunction", e);
                 throw new TollboothException(e.getMessage(), e);
-            } else {
-                logMessage(logName + ": malfunction", e);
-                reset(remainingRetryCount - 1, logName, true);
             }
+
+            reset(remainingRetryCount, logName, true);
         }
     }
 }

@@ -236,11 +236,11 @@ public class TollboothTest {
             assertEquals(e.getMessage(), IsOpenMalfunctionGateController.class.getName());
         }
 
-        // isOpen, but should fail
         try {
             gate.isOpen();
         } catch (TollboothException e) {
-            assertEquals(e.getMessage(), "isOpen: will not respond");
+            assertEquals(e.getMessage(),
+                    "tollbooth.gatecontroller.IsOpenMalfunctionGateController");
         }
 
         // Close, but should fail
