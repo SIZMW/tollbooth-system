@@ -5,7 +5,7 @@ Tollbooth Tollgate System
 This project is used to demonstrate a tollbooth tollgate system built from specified user stories that describe how the tollbooth and the tollgate controllers interact.
 
 ## Building
-This project can be imported into [Eclipse](https://eclipse.org/downloads/) as a project, which can then compile it.
+This project can be imported into [Eclipse](https://eclipse.org/downloads/) as a project, which can then be compiled.
 
 ## Execution
 The project can be executed by running the [JUnit](http://junit.org/) test cases under the ```test``` directory.
